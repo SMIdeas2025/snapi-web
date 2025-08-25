@@ -89,6 +89,13 @@ export default function StyleSelector() {
     );
   };
 
+  const updateStyle = () => {
+    //
+    console.log(selectedStyles);
+    localStorage.setItem("signupStyle", JSON.stringify(selectedStyles));
+    router.push("/category");
+  };
+
   return (
     <div
       className="min-h-screen  p-6"
@@ -155,7 +162,7 @@ export default function StyleSelector() {
           <Button
             className="bg-slate-600 hover:bg-slate-500 text-white px-12 py-3 rounded-lg font-sans font-medium text-lg transition-colors duration-200"
             disabled={selectedStyles.length === 0}
-            onClick={() => router.push("/category")}
+            onClick={() => updateStyle()}
           >
             Next
           </Button>

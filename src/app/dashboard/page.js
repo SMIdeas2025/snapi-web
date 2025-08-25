@@ -3,8 +3,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "../components/ui/button";
 import Link from "next/link";
-
+import { useDispatch, useSelector } from "react-redux";
+import { getRecommendationProduct } from "../store/actions/Product/index";
 export default function SnapiDashboard() {
+  const dispatch = useDispatch();
+  const { recommendationData, recommendationLoading, recommendationError } =
+    useSelector((state) => state.GET_RECOMMENDATION);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -40,6 +44,10 @@ export default function SnapiDashboard() {
   const audioRef = useRef(null);
   const animationRef = useRef(null);
   const recordingAnimationRef = useRef(null);
+
+  useEffect(() => {
+    dispatch(getRecommendationProduct());
+  }, []);
 
   useEffect(() => {
     if (isPlaying && analyser && dataArray) {
@@ -356,7 +364,7 @@ export default function SnapiDashboard() {
     <div
       className="min-h-screen  relative"
       style={{
-        background: `radial-gradient(50% 50% at 50% 50%, #83CBEB 0%, #186B91 50%, #0D3A4E 100%);`,
+        background: `#111827`,
       }}
     >
       <input

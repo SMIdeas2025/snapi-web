@@ -1,5 +1,9 @@
+"use client";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
+import { Provider } from "react-redux";
+import store from "./store/store";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,19 +15,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
-  title: "Snapi",
-  description: "Snapi AI",
-};
-
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <Provider store={store}>{children}</Provider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

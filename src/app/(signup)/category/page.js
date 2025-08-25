@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { updatePreferance } from "../../store/actions/Profile/index";
 const categoryOptions = [
   { id: "fitness-sports", name: "Fitness & Sports", icon: "🏆" },
   { id: "footwear", name: "Footwear", icon: "👟" },
@@ -23,7 +25,11 @@ const categoryOptions = [
 ];
 
 export default function CategorySelector() {
+  const dispatch = useDispatch();
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const { preferanceData, preferanceLoading, prederanceError } = useSelector(
+    (state) => state.UPDATE_PREFERANCE
+  );
   const router = useRouter();
   const toggleCategory = (categoryId) => {
     setSelectedCategories((prev) =>
@@ -31,6 +37,18 @@ export default function CategorySelector() {
         ? prev.filter((id) => id !== categoryId)
         : [...prev, categoryId]
     );
+  };
+
+  const updateCategory = () => {
+    let payload = JSON.stringify({
+      userId: localStorage.getItem("userId"),
+      preferences: {
+        style: JSON.parse(localStorage.getItem("signupStyle")),
+        category: selectedCategories,
+      },
+    });
+    dispatch(updatePreferance(payload));
+    router.push("/values");
   };
 
   return (
@@ -84,7 +102,7 @@ export default function CategorySelector() {
           <Button
             className="bg-slate-600 hover:bg-slate-500 text-white px-12 py-3 rounded-lg font-sans font-medium text-lg transition-colors duration-200"
             disabled={selectedCategories.length === 0}
-            onClick={() => router.push("/values")}
+            onClick={() => updateCategory()}
           >
             Next
           </Button>
