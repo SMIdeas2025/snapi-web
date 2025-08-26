@@ -5,7 +5,9 @@ import { Button } from "../components/ui/button";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import { getRecommendationProduct } from "../store/actions/Product/index";
-import { getChatHistory } from "../store/actions/Chat/index";
+import { getChatHistory, handleUserQuery } from "../store/actions/Chat/index";
+import io from "socket.io-client";
+import UserChatHistory from "./UserChatHistory";
 export default function SnapiDashboard() {
   const dispatch = useDispatch();
   const { recommendationData, recommendationLoading, recommendationError } =
@@ -13,6 +15,10 @@ export default function SnapiDashboard() {
   const { history, historyLoading, historyError } = useSelector(
     (state) => state.CHAT_HISTORY
   );
+  const { responseData, queryLoading, queryError } = useSelector(
+    (state) => state.USER_QUERY
+  );
+  const [myQuery, setMyQuery] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -41,13 +47,16 @@ export default function SnapiDashboard() {
       Apparel: ["Calvin Cline", "H&M", "Zara", "Something", "Something"],
     },
   });
-
+  const [socket, setSocket] = useState(null);
+  const [message, setMessage] = useState("");
+  const [responses, setResponses] = useState([]);
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
   const animationRef = useRef(null);
   const recordingAnimationRef = useRef(null);
+  const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
     dispatch(getRecommendationProduct());
@@ -163,6 +172,66 @@ export default function SnapiDashboard() {
         alert("Could not access microphone. Please check permissions.");
       }
     }
+  };
+
+  const handleMessageSend = () => {
+    if (!socket || !myQuery.trim()) return;
+
+    const payload = JSON.stringify({
+      message: myQuery,
+      userId: localStorage.getItem("userId"),
+      sessionId: sessionId,
+    });
+    let payload_one = {
+      message: myQuery,
+      userId: localStorage.getItem("userId"),
+      sessionId: sessionId,
+    };
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: myQuery,
+    };
+
+    setResponses((prev) => [...prev, userMessage]);
+
+    dispatch(handleUserQuery(payload));
+
+    console.log("📤 Sending:", payload);
+
+    socket.emit("user-query", payload_one, (ack) => {
+      console.log("✅ Ack from server:", ack);
+    });
+
+    setMyQuery("");
+  };
+
+  const handleMessageSendFromProp = (v) => {
+    if (!socket || !v.trim()) return;
+
+    const payload = JSON.stringify({
+      message: v,
+      userId: localStorage.getItem("userId"),
+      sessionId: sessionId,
+    });
+
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: v,
+    };
+
+    setResponses((prev) => [...prev, userMessage]);
+
+    dispatch(handleUserQuery(payload));
+
+    console.log("📤 Sending:", payload);
+
+    socket.emit("user-query", payload, (ack) => {
+      console.log("✅ Ack from server:", ack);
+    });
+
+    setMyQuery("");
   };
 
   const playRecording = async () => {
@@ -308,8 +377,6 @@ export default function SnapiDashboard() {
 
   const missions = ["Home decor", "Study setup", "Camping essentials"];
 
-  console.log("recommendationData", history);
-
   const removeAestheticType = (type) => {
     setProfileData((prev) => ({
       ...prev,
@@ -369,6 +436,80 @@ export default function SnapiDashboard() {
   {
     /* Profile Popup Overlay */
   }
+  useEffect(() => {
+    const newSocket = io("ws://54.173.124.156:3002/shopping", {
+      query: { userId: localStorage.getItem("userId") },
+      transports: ["websocket"],
+    });
+
+    newSocket.on("connect", () => {
+      console.log("✅ Socket connected:", newSocket.id);
+    });
+
+    // Catch-all listener
+    newSocket.onAny((event, ...args) => {
+      console.log("📩 Incoming event:", event, args);
+    });
+
+    newSocket.on("connect_error", (err) => {
+      console.error("❌ Connection error:", err.message);
+    });
+
+    newSocket.on("disconnect", (reason) => {
+      console.warn("⚠️ Socket disconnected:", reason);
+    });
+
+    newSocket.on("exception", (err) => {
+      console.error("❌ Server exception:", err);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
+
+  // 👇 whenever responseData changes, push it as a new bot message
+  useEffect(() => {
+    if (!responseData) return;
+
+    // API gives {response: {...}}, unwrap it
+    const apiRes = responseData.response || responseData;
+
+    console.log("🔥 Raw responseData:", responseData);
+    console.log("🟡 apiRes extracted:", apiRes);
+
+    let botMessage = { id: Date.now(), type: "bot", content: null };
+
+    // Case 1: Clarification
+    if (responseData.needsClarification && responseData.clarificationQuestion) {
+      botMessage.content = responseData.clarificationQuestion;
+      botMessage.suggestions = responseData.suggestions || [];
+    }
+
+    // Case 2: Shopping results
+    if (apiRes.shopping_results && Array.isArray(apiRes.shopping_results)) {
+      botMessage.results = apiRes.shopping_results.map((item) => ({
+        product_id: item.product_id || item.position,
+        title: item.title,
+        price: item.price ? `${item.price}` : item.price || "N/A",
+        thumbnail: item.thumbnail,
+      }));
+    }
+
+    // Case 3: fallback text
+    if (!botMessage.content && !botMessage.results && apiRes.message) {
+      botMessage.content = apiRes.message;
+    }
+
+    // Push only if something exists
+    if (botMessage.content || botMessage.suggestions || botMessage.results) {
+      setResponses((prev) => [...prev, botMessage]);
+    }
+
+    console.log("🟢 Bot message mapped:", botMessage);
+  }, [responseData]);
 
   return (
     <div
@@ -666,116 +807,126 @@ export default function SnapiDashboard() {
           </div>
         )}
 
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-sans text-white font-medium mb-2">
-            Good Morning !
-          </h2>
-          <p className="text-slate-300 font-sans text-lg mb-4">
-            I'm your personal shopping buddy. Let's explore the way of life
-            together
-          </p>
-          <p className="text-slate-300 font-sans text-lg">
-            Tell me what you're looking for ? I'll fetch the best picks for you!
-          </p>
-        </div>
+        <div className="mb-100">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-sans text-white font-medium mb-2">
+              Good Morning !
+            </h2>
+            <p className="text-slate-300 font-sans text-lg mb-4">
+              I'm your personal shopping buddy. Let's explore the way of life
+              together
+            </p>
+            <p className="text-slate-300 font-sans text-lg">
+              Tell me what you're looking for ? I'll fetch the best picks for
+              you!
+            </p>
+          </div>
 
-        {/* Snapi Recommendations */}
-        <div className="mb-8">
-          <h3 className="text-2xl font-sans text-white font-medium mb-6">
-            Snapi Recommendations
-          </h3>
-          <div className="flex gap-6 overflow-x-auto pb-4">
-            {recommendationData.map((item) => (
-              <div
-                key={item.product_id}
-                className="flex-shrink-0 w-72 bg-slate-700/50 rounded-xl p-4 border border-slate-600/50"
-              >
-                <div className="flex gap-4">
-                  <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-600">
-                    <img
-                      src={item.thumbnail || "/placeholder.svg"}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-white font-medium mb-1">
-                      {item.title}
-                    </h4>
-                    {/* <p className="text-slate-400 text-sm mb-2">
+          {/* Snapi Recommendations */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-sans text-white font-medium mb-6">
+              Snapi Recommendations
+            </h3>
+            <div className="flex gap-6 overflow-x-auto pb-4">
+              {recommendationData.map((item) => (
+                <div
+                  key={item.product_id}
+                  className="flex-shrink-0 w-72 bg-slate-700/50 rounded-xl p-4 border border-slate-600/50"
+                >
+                  <div className="flex gap-4">
+                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-600">
+                      <img
+                        src={item.thumbnail || "/placeholder.svg"}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium mb-1">
+                        {item.title}
+                      </h4>
+                      {/* <p className="text-slate-400 text-sm mb-2">
                       {item.description}
                     </p> */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-cyan-400 font-medium">
-                        {item.price}
-                      </span>
-                      <button className="text-yellow-400 hover:text-yellow-300">
-                        <svg
-                          className="w-5 h-5"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center justify-between">
+                        <span className="text-cyan-400 font-medium">
+                          {item.price}
+                        </span>
+                        <button className="text-yellow-400 hover:text-yellow-300">
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Smart Collections */}
-        <div className="mb-8">
-          <h3 className="text-2xl font-sans text-white font-medium mb-6">
-            Smart Collections
-          </h3>
-          <div className="flex flex-wrap gap-4">
-            {smartCollections.map((collection, index) => (
-              <Button
-                key={index}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
-              >
-                {collection}
-              </Button>
-            ))}
+          {/* Smart Collections */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-sans text-white font-medium mb-6">
+              Smart Collections
+            </h3>
+            <div className="flex flex-wrap gap-4">
+              {smartCollections.map((collection, index) => (
+                <Button
+                  key={index}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
+                >
+                  {collection}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Recent Conversations */}
-        <div className="mb-8">
-          <h3 className="text-2xl font-sans text-white font-medium mb-6">
-            Recent Conversations
-          </h3>
-          <div className="flex flex-wrap gap-4">
-            {recentConversations.map((conversation, index) => (
-              <Button
-                key={index}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
-              >
-                {conversation}
-              </Button>
-            ))}
+          {/* Recent Conversations */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-sans text-white font-medium mb-6">
+              Recent Conversations
+            </h3>
+            <div className="flex flex-wrap gap-4">
+              {recentConversations.map((conversation, index) => (
+                <Button
+                  key={index}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
+                >
+                  {conversation}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* My Missions */}
-        <div className="mb-8">
-          <h3 className="text-2xl font-sans text-white font-medium mb-6">
-            My Missions
-          </h3>
-          <div className="flex flex-wrap gap-4">
-            {missions.map((mission, index) => (
-              <Button
-                key={index}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
-              >
-                {mission}
-              </Button>
-            ))}
+          {/* My Missions */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-sans text-white font-medium mb-6">
+              My Missions
+            </h3>
+            <div className="flex flex-wrap gap-4">
+              {missions.map((mission, index) => (
+                <Button
+                  key={index}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-sans"
+                >
+                  {mission}
+                </Button>
+              ))}
+            </div>
           </div>
+          {/* Chat History */}
+
+          <UserChatHistory
+            response={responses}
+            handleMessageSend={handleMessageSendFromProp}
+            setMyQuery={setMyQuery}
+          />
         </div>
 
         {/* Bottom Input Area */}
@@ -879,6 +1030,7 @@ export default function SnapiDashboard() {
                   type="text"
                   placeholder="Ask anything ..."
                   className="flex-1 bg-transparent text-white placeholder-slate-400 outline-none"
+                  onChange={(e) => setMyQuery(e.target.value)}
                 />
                 <div className="flex items-center gap-3">
                   <button
@@ -925,7 +1077,10 @@ export default function SnapiDashboard() {
                       />
                     </svg>
                   </button>
-                  <button className="text-white hover:text-gray-300">
+                  <button
+                    className="text-white hover:text-gray-300"
+                    onClick={handleMessageSend}
+                  >
                     <svg
                       className="w-6 h-6"
                       fill="none"

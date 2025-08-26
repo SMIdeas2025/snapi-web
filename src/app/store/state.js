@@ -28,10 +28,17 @@ const chatHistoryState = {
   historyError: null,
 };
 
+const userQueryState = {
+  responseData: null,
+  queryLoading: false,
+  queryError: null,
+};
+
 export {
   signupAuthState,
   updatePreferanceState,
   userRecommendationState,
   loginAuthState,
   chatHistoryState,
+  userQueryState,
 };
