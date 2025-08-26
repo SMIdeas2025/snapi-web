@@ -5,10 +5,14 @@ import { Button } from "../components/ui/button";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import { getRecommendationProduct } from "../store/actions/Product/index";
+import { getChatHistory } from "../store/actions/Chat/index";
 export default function SnapiDashboard() {
   const dispatch = useDispatch();
   const { recommendationData, recommendationLoading, recommendationError } =
     useSelector((state) => state.GET_RECOMMENDATION);
+  const { history, historyLoading, historyError } = useSelector(
+    (state) => state.CHAT_HISTORY
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -47,6 +51,10 @@ export default function SnapiDashboard() {
 
   useEffect(() => {
     dispatch(getRecommendationProduct());
+  }, []);
+
+  useEffect(() => {
+    dispatch(getChatHistory());
   }, []);
 
   useEffect(() => {
@@ -300,6 +308,8 @@ export default function SnapiDashboard() {
 
   const missions = ["Home decor", "Study setup", "Camping essentials"];
 
+  console.log("recommendationData", history);
+
   const removeAestheticType = (type) => {
     setProfileData((prev) => ({
       ...prev,
@@ -496,30 +506,13 @@ export default function SnapiDashboard() {
               Chats
             </h3>
             <div className="space-y-1 overflow-y-auto h-full pb-20">
-              {[
-                "Shoes under 100$",
-                "Comparison between Nike & ...",
-                "Aesthetic types list",
-                "Home interior decorations",
-                "Shoes under 100$",
-                "Comparison between Nike & ...",
-                "Aesthetic types list",
-                "Home interior decorations",
-                "Shoes under 100$",
-                "Comparison between Nike & ...",
-                "Aesthetic types list",
-                "Home interior decorations",
-                "Shoes under 100$",
-                "Comparison between Nike & ...",
-                "Aesthetic types list",
-                "Home interior decorations",
-              ].map((chat, index) => (
+              {history.map((chat, index) => (
                 <a
                   key={index}
                   href="#"
-                  className="block text-slate-300 hover:text-white hover:bg-slate-700/50 py-3 px-2 rounded-lg text-sm transition-colors"
+                  className="block text-slate-300 hover:text-white hover:bg-slate-700/50 py-3 px-2 rounded-lg text-sm transition-colors truncate"
                 >
-                  {chat}
+                  {chat.mainPrompt}
                 </a>
               ))}
             </div>
@@ -693,24 +686,26 @@ export default function SnapiDashboard() {
             Snapi Recommendations
           </h3>
           <div className="flex gap-6 overflow-x-auto pb-4">
-            {recommendations.map((item) => (
+            {recommendationData.map((item) => (
               <div
-                key={item.id}
+                key={item.product_id}
                 className="flex-shrink-0 w-72 bg-slate-700/50 rounded-xl p-4 border border-slate-600/50"
               >
                 <div className="flex gap-4">
                   <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-600">
                     <img
-                      src={item.image || "/placeholder.svg"}
-                      alt={item.name}
+                      src={item.thumbnail || "/placeholder.svg"}
+                      alt={item.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-white font-medium mb-1">{item.name}</h4>
-                    <p className="text-slate-400 text-sm mb-2">
+                    <h4 className="text-white font-medium mb-1">
+                      {item.title}
+                    </h4>
+                    {/* <p className="text-slate-400 text-sm mb-2">
                       {item.description}
-                    </p>
+                    </p> */}
                     <div className="flex items-center justify-between">
                       <span className="text-cyan-400 font-medium">
                         {item.price}

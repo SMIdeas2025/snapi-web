@@ -12,8 +12,9 @@ const getRecommendationProduct = () => async (dispatch) => {
     const res = await api.get(
       `chat/api/shopping/getUserRecommendations/${userid}`
     );
+    console.log("res?", res);
 
-    dispatch(successGetRecommendation(res?.data));
+    dispatch(successGetRecommendation(res));
   } catch (error) {
     dispatch(
       errorGetRecommendation(error.response?.data?.message || error.message)

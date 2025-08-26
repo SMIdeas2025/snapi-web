@@ -6,16 +6,16 @@ const userRecommendationSlice = createSlice({
   initialState: userRecommendationState,
   reducers: {
     startGetRecommendation: (state) => {
-      state.preferanceLoading = true;
-      state.prederanceError = null;
+      state.recommendationLoading = true;
+      state.recommendationError = null;
     },
     successGetRecommendation: (state, action) => {
-      state.preferanceLoading = false;
-      state.preferanceData = action.payload;
+      state.recommendationLoading = false;
+      state.recommendationData = action.payload;
     },
     errorGetRecommendation: (state, action) => {
-      state.preferanceLoading = false;
-      state.prederanceError = action.payload;
+      state.recommendationLoading = false;
+      state.recommendationError = action.payload;
     },
   },
 });

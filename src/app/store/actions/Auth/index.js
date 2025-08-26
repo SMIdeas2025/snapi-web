@@ -8,7 +8,7 @@ import {
   successSignup,
 } from "../../slices/Auth";
 
-const signupAuth = (payload, router) => async (dispatch) => {
+const signupAuth = (payload) => async (dispatch) => {
   dispatch(startSignup());
   try {
     const res = await api.post("auth/api/auth/signup", payload);
@@ -16,20 +16,20 @@ const signupAuth = (payload, router) => async (dispatch) => {
     dispatch(successSignup(res?.data));
     localStorage.setItem("userId", res?.data?.userid);
     localStorage.setItem("token", res?.data?.token);
-    router.push("/dashboard");
   } catch (error) {
     dispatch(errorSignup(error.response?.data?.message || error.message));
   }
 };
 
-const loginAuth = (payload) => async (dispatch) => {
+const loginAuth = (payload, router) => async (dispatch) => {
   dispatch(startLogin());
   try {
     const res = await api.post("auth/api/auth/login", payload);
-    console.log("data=====>", res?.data);
     dispatch(successLogin(res?.data));
+    console.log(res?.data);
     localStorage.setItem("userId", res?.data?.userid);
     localStorage.setItem("token", res?.data?.token);
+    router.push("/dashboard");
   } catch (error) {
     dispatch(errorLogin(error.response?.data?.message || error.message));
   }

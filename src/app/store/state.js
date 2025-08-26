@@ -22,9 +22,16 @@ const userRecommendationState = {
   recommendationError: null,
 };
 
+const chatHistoryState = {
+  history: [],
+  historyLoading: false,
+  historyError: null,
+};
+
 export {
   signupAuthState,
   updatePreferanceState,
   userRecommendationState,
   loginAuthState,
+  chatHistoryState,
 };
