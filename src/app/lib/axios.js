@@ -2,9 +2,7 @@ import axios from "axios";
 
 // Create an Axios instance
 const api = axios.create({
-  baseURL:
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://mhid03gncc.execute-api.us-east-1.amazonaws.com/",
+  baseURL: "https://mhid03gncc.execute-api.us-east-1.amazonaws.com/",
   headers: {
     "Content-Type": "application/json",
   },
