@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getRecommendationProduct } from "../store/actions/Product/index";
 import { getChatHistory, handleUserQuery } from "../store/actions/Chat/index";
 import io from "socket.io-client";
-import UserChatHistory from "./UserChatHistory";
+import UserChatHistory from "./userChatHistory";
 export default function SnapiDashboard() {
   const dispatch = useDispatch();
   const { recommendationData, recommendationLoading, recommendationError } =
