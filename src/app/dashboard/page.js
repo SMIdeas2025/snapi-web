@@ -8,8 +8,11 @@ import { getRecommendationProduct } from "../store/actions/Product/index";
 import { getChatHistory, handleUserQuery } from "../store/actions/Chat/index";
 import io from "socket.io-client";
 import UserChatHistory from "./userChatHistory";
+import { useRouter } from "next/navigation";
+
 export default function SnapiDashboard() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const { recommendationData, recommendationLoading, recommendationError } =
     useSelector((state) => state.GET_RECOMMENDATION);
   const { history, historyLoading, historyError } = useSelector(
@@ -57,6 +60,7 @@ export default function SnapiDashboard() {
   const animationRef = useRef(null);
   const recordingAnimationRef = useRef(null);
   const [sessionId, setSessionId] = useState("");
+  const [base64Image, setBase64Image] = useState(null);
 
   useEffect(() => {
     dispatch(getRecommendationProduct());
@@ -107,7 +111,11 @@ export default function SnapiDashboard() {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setSelectedImage(e.target?.result);
+        const base64String = e.target?.result; // ✅ this is base64
+        console.log("Base64 Image:", base64String);
+        setBase64Image(base64String);
+        // if you want to keep in state
+        setSelectedImage(base64String);
       };
       reader.readAsDataURL(file);
     }
@@ -174,9 +182,39 @@ export default function SnapiDashboard() {
     }
   };
 
+  const sendImageResponse = () => {
+    try {
+      let payload = {
+        message: myQuery,
+        userId: localStorage.getItem("userId"),
+        sessionId: sessionId,
+        imageBase64: base64Image,
+      };
+
+      const userMessage = {
+        id: Date.now(),
+        type: "user",
+        image: base64Image,
+        content: myQuery,
+      };
+      setResponses((prev) => [...prev, userMessage]);
+      socket.emit("image-query", payload, (ack) => {
+        console.log("✅ Ack from server:", ack);
+      });
+      setBase64Image(null);
+      setMyQuery("");
+      setSelectedImage(null);
+    } catch (error) {
+      console.log("error", error);
+    }
+  };
+
   const handleMessageSend = () => {
     if (!socket || !myQuery.trim()) return;
-
+    if (base64Image) {
+      sendImageResponse();
+      return;
+    }
     const payload = JSON.stringify({
       message: myQuery,
       userId: localStorage.getItem("userId"),
@@ -190,6 +228,7 @@ export default function SnapiDashboard() {
     const userMessage = {
       id: Date.now(),
       type: "user",
+      image: base64Image,
       content: myQuery,
     };
 
@@ -433,6 +472,37 @@ export default function SnapiDashboard() {
     }
   };
 
+  // helper to build a bot message
+  const buildBotMessage = (data) => {
+    const apiRes = data.response || {};
+    let botMessage = { id: Date.now(), type: "bot", content: null };
+
+    // Case 1: Clarification
+    if (data.needsClarification && data.clarificationQuestion) {
+      botMessage.content = data.clarificationQuestion;
+      botMessage.suggestions = data.suggestions || [];
+    }
+
+    // Case 2: Visual matches (products)
+    if (apiRes.visual_matches && Array.isArray(apiRes.visual_matches)) {
+      botMessage.results = apiRes.visual_matches.map((item, idx) => ({
+        product_id: item.product_id || item.position || idx,
+        title: item.title,
+        price: item.price?.value || item.price?.extracted_value || "N/A",
+        thumbnail: item.thumbnail || item.image,
+        link: item.link,
+        source: item.source,
+      }));
+    }
+
+    // Case 3: fallback text
+    if (!botMessage.content && !botMessage.results) {
+      botMessage.content = data.message || "Here are some results.";
+    }
+
+    return botMessage;
+  };
+
   {
     /* Profile Popup Overlay */
   }
@@ -446,9 +516,19 @@ export default function SnapiDashboard() {
       console.log("✅ Socket connected:", newSocket.id);
     });
 
-    // Catch-all listener
-    newSocket.onAny((event, ...args) => {
-      console.log("📩 Incoming event:", event, args);
+    newSocket.on("image-query-response", (data) => {
+      console.log("📩 Incoming event (raw):", JSON.stringify(data, null, 2));
+
+      const apiRes = data.response || {};
+      console.log("🔎 apiRes keys:", Object.keys(apiRes));
+
+      const botMessage = buildBotMessage(data);
+
+      console.log("🟢 Bot message mapped:", botMessage);
+
+      if (botMessage.content || botMessage.suggestions || botMessage.results) {
+        setResponses((prev) => [...prev, botMessage]);
+      }
     });
 
     newSocket.on("connect_error", (err) => {
@@ -477,7 +557,7 @@ export default function SnapiDashboard() {
     // API gives {response: {...}}, unwrap it
     const apiRes = responseData.response || responseData;
 
-    console.log("🔥 Raw responseData:", responseData);
+    console.log("🔥 Raw responseData:", responseData.sessionId);
     console.log("🟡 apiRes extracted:", apiRes);
 
     let botMessage = { id: Date.now(), type: "bot", content: null };
@@ -496,6 +576,7 @@ export default function SnapiDashboard() {
         price: item.price ? `${item.price}` : item.price || "N/A",
         thumbnail: item.thumbnail,
       }));
+      // router.push("/chat/" + responseData.sessionId);
     }
 
     // Case 3: fallback text
@@ -722,7 +803,10 @@ export default function SnapiDashboard() {
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-white font-medium">Selected Image</h4>
               <button
-                onClick={() => setSelectedImage(null)}
+                onClick={() => {
+                  setSelectedImage(null);
+                  setBase64Image(null);
+                }}
                 className="text-slate-400 hover:text-white"
               >
                 <svg

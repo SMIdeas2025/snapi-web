@@ -34,6 +34,12 @@ const userQueryState = {
   queryError: null,
 };
 
+const sessionDetailState = {
+  sessionDetail: [],
+  loadingSessionDetail: false,
+  errorSessionDetail: null,
+};
+
 export {
   signupAuthState,
   updatePreferanceState,
@@ -41,4 +47,5 @@ export {
   loginAuthState,
   chatHistoryState,
   userQueryState,
+  sessionDetailState,
 };

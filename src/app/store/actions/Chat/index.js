@@ -1,10 +1,13 @@
 import api from "../../../lib/axios";
 import {
   errorGetChatHistory,
+  errroGetSessionDetail,
   errrorGetUserQuery,
   startGetChatHistory,
+  startGetSessionDetail,
   startGetUserQuery,
   successGetChatHistory,
+  successGetSessionDetail,
   successGetUserQuery,
 } from "../../slices/Chat";
 
@@ -28,7 +31,6 @@ const handleUserQuery = (payload) => async (dispatch) => {
 
   try {
     const res = await api.post(`chat/api/shopping/user-query`, payload);
-    console.log("res===?", res);
 
     dispatch(successGetUserQuery(res));
   } catch (error) {
@@ -38,4 +40,18 @@ const handleUserQuery = (payload) => async (dispatch) => {
   }
 };
 
-export { getChatHistory, handleUserQuery };
+const getSessionDetail = (payload) => async (dispatch) => {
+  dispatch(startGetSessionDetail());
+
+  try {
+    const res = await api.get(`chat/api/shopping/getSessionDetails/${payload}`);
+
+    dispatch(successGetSessionDetail(res));
+  } catch (error) {
+    dispatch(
+      errroGetSessionDetail(error.response?.data?.message || error.message)
+    );
+  }
+};
+
+export { getChatHistory, handleUserQuery, getSessionDetail };

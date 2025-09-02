@@ -4,6 +4,7 @@ import { profilePreferanceUpdateReducer } from "../slices/Profile/index";
 import { getRecommendationReducer } from "../slices/Product/index";
 import {
   getChatHistoryReducer,
+  getSessionDetailReducer,
   getUserChatQueryReducer,
 } from "../slices/Chat/index";
 
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   LOGIN: loginAuthReducer,
   CHAT_HISTORY: getChatHistoryReducer,
   USER_QUERY: getUserChatQueryReducer,
+  CHAT_SESSION_DETAIL: getSessionDetailReducer,
   //   user: userReducer,
 });
 
